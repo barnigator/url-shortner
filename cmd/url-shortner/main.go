@@ -2,9 +2,14 @@ package main
 
 import (
 	"log/slog"
+	"net/http"
 	"os"
 	"url-shortner/internal/config"
+	"url-shortner/internal/http-server/handlers/redirect"
+	"url-shortner/internal/http-server/handlers/url/deleteURL"
+	"url-shortner/internal/http-server/handlers/url/save"
 	"url-shortner/internal/http-server/middleware/logger"
+	slogpretty "url-shortner/internal/lib/logger/handlers/slogprety"
 	"url-shortner/internal/lib/logger/sl"
 	"url-shortner/internal/storage/sqlite"
 
@@ -23,7 +28,10 @@ func main() {
 
 	log := setupLogger(cfg.Env)
 
-	log.Info("starting url-shortner", slog.String("env", cfg.Env))
+	log.Info("starting url-shortner",
+		slog.String("env", cfg.Env),
+		slog.String("version", "123"),
+	)
 	log.Debug("debug messages are enabled")
 
 	storage, err := sqlite.New(cfg.StoragePath)
@@ -31,6 +39,7 @@ func main() {
 		log.Error("failed to init storage", sl.Err(err))
 		os.Exit(1)
 	}
+	_ = storage
 
 	router := chi.NewRouter()
 
@@ -40,7 +49,25 @@ func main() {
 	router.Use(middleware.Recoverer)
 	router.Use(middleware.URLFormat)
 
-	//TODO: run server
+	router.Post("/url", save.New(log, storage))
+	router.Get("/{alias}", redirect.New(log, storage))
+	router.Delete("/url/{alias}", deleteURL.New(log, storage))
+
+	log.Info("starting server", slog.String("address", cfg.Address))
+
+	srv := &http.Server{
+		Addr:         cfg.Address,
+		Handler:      router,
+		ReadTimeout:  cfg.HTTPServer.Timeout,
+		WriteTimeout: cfg.HTTPServer.Timeout,
+		IdleTimeout:  cfg.HTTPServer.IdleTimeout,
+	}
+
+	if err := srv.ListenAndServe(); err != nil {
+		log.Error("failed to start server")
+	}
+
+	log.Error("server stopped")
 
 }
 
@@ -48,7 +75,7 @@ func setupLogger(env string) *slog.Logger {
 	var log *slog.Logger
 	switch env {
 	case envLocal:
-		log = slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelDebug}))
+		log = setupPrettySlog()
 	case envDev:
 		log = slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelDebug}))
 	case envProd:
@@ -56,4 +83,16 @@ func setupLogger(env string) *slog.Logger {
 	}
 
 	return log
+}
+
+func setupPrettySlog() *slog.Logger {
+	opts := slogpretty.PrettyHandlerOptions{
+		SlogOpts: &slog.HandlerOptions{
+			Level: slog.LevelDebug,
+		},
+	}
+
+	handler := opts.NewPrettyHandler(os.Stdout)
+
+	return slog.New(handler)
 }
