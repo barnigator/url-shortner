@@ -8,8 +8,8 @@ WorkingDirectory=/root/apps/url-shortner
 ExecStart=/root/apps/url-shortner/url-shortner
 Restart=always
 RestartSec=4
-StandartOutput=inherit
-EnviromentFile=/root/apps/url-shortner/config.env
+StandardOutput=inherit
+EnvironmentFile=/root/apps/url-shortner/config.env
 
 [Install]
 WantedBy=multi-user.target
