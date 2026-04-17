@@ -24,7 +24,7 @@ jobs:
       - name: Check if tag exists
         run: |
           git fetch --all --tags
-          if ! git tag | grep -q "^${{ github.event.inputs.tag }}"; then
+          if ! git tag | grep -q "^${{ github.event.inputs.tag }}$"; then
             echo "error: Tag '${{ github.event.inputs.tag }}' not found"
             exit 1
           fi
@@ -52,13 +52,13 @@ jobs:
         run: |
           echo "Listing deployment folder contents:"
           ls -la ${{ github.workspace }}/deployment
-      - name: Create enviroment file on http_server
+      - name: Create enviroment file on server
         run: |
           ssh -i deploy_key.pem -o StrictHostKeyChecking=no ${{ env.HOST }} "\
           touch ${{ env.ENV_FILE_PATH }} && \
           chmod 600 ${{ env.ENV_FILE_PATH }} && \
           echo 'CONFIG_PATH=${{ env.CONFIG_PATH }}' > ${{ env.ENV_FILE_PATH }} && \
-          echo 'HTTP_SERVER_PASSWORD=${{ secrets.AUTH_PASS }}' >> ${{ env.ENV_FILE_PATH}}"
+          echo 'HTTP_SERVER_PASSWORD=${{ secrets.AUTH_PASS }}' >> ${{ env.ENV_FILE_PATH }}"
       - name: Copy systemd service file
         run: |
           scp -i deploy_key.pem -o StrictHostKeyChecking=no ${{ github.workspace }}/deployment/url-shortner.service ${{ env.HOST }}:/tmp/url-shortner.service
